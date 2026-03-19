@@ -79,6 +79,16 @@
 
 ---
 
+## Fase 7: GitHub OAuth
+
+- [x] **T-46**: `authService.gitHubCallback(code, state)` — llama a `GET /api/v1/auth/login/github/callback?code=...&state=...` y devuelve `LoginResponse` ✅
+- [x] **T-47**: `completeGitHubLogin(code, state)` en `AuthContext` — intercambia code+state por tokens, guarda `access_token` en memoria y programa refresh proactivo ✅
+- [x] **T-48**: Hook `useGitHubLogin` — obtiene `authorization_url` del backend con `getGitHubAuthUrl()` y redirige el navegador a GitHub con `globalThis.location.href` ✅
+- [x] **T-49**: Botón "Continuar con GitHub" en `LoginForm.tsx` — separador visual, icono SVG GitHub, deshabilita ambos botones durante operación, error accesible (`aria-live`) ✅
+- [x] **T-50**: Página `/login/github/callback` — lee `code`+`state` de query params, llama `completeGitHubLogin`, redirige a `/dashboard` con `router.replace`; spinner accesible en carga, mensaje de error específico en fallo ✅
+
+---
+
 ## Resumen de Estado
 
 | Fase | Descripción | Estado |
@@ -89,3 +99,4 @@
 | Fase 4 | Protección de rutas | ✅ Completada |
 | Fase 5 | Feature Profile | ✅ Completada |
 | Fase 6 | Accesibilidad y UX | ⚪ Parcial (T-42, T-43 ✅ — T-44, T-45 requieren QA manual) |
+| Fase 7 | GitHub OAuth | ✅ Completada |

@@ -19,6 +19,7 @@ Necesitamos decidir cómo almacenar y renovar estos tokens de forma segura en el
 | `refresh_token` | **HttpOnly Cookie** (servidor) | XSS-proof: JS del cliente no puede leerla |
 
 No usamos **NextAuth.js** por las siguientes razones:
+
 - Añade abstracción innecesaria sobre un backend propio ya controlado
 - El backend de ikctl maneja toda la lógica de auth — NextAuth.js duplicaría la lógica de tokens
 - Mayor control sobre los flujos de 2FA y GitHub OAuth específicos de ikctl

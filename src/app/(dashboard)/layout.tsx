@@ -4,6 +4,7 @@ import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { useAuthContext } from "@/contexts/AuthContext"
+import { Button } from "@/components/ui/button"
 
 /** Layout del área autenticada (dashboard, profile) */
 export default function DashboardLayout({
@@ -11,7 +12,7 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const { isAuthenticated, isLoading } = useAuthContext()
+  const { isAuthenticated, isLoading, logout } = useAuthContext()
   const router = useRouter()
 
   useEffect(() => {
@@ -44,6 +45,9 @@ export default function DashboardLayout({
             <Link href="/profile" className="text-muted-foreground hover:text-foreground">
               Perfil
             </Link>
+            <Button variant="outline" size="sm" onClick={logout}>
+              Cerrar sesión
+            </Button>
           </nav>
         </div>
       </header>

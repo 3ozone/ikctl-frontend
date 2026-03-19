@@ -27,13 +27,14 @@ export class ApiError extends Error {
 // ─── Core fetch wrapper ───────────────────────────────────────────────────────
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const { headers: optionHeaders, ...restOptions } = options
   const response = await fetch(`${API_BASE_URL}${path}`, {
     credentials: "include", // siempre — para enviar/recibir cookies HttpOnly
+    ...restOptions,
     headers: {
       "Content-Type": "application/json",
-      ...options.headers,
+      ...optionHeaders,
     },
-    ...options,
   })
 
   if (!response.ok) {

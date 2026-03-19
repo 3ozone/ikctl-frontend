@@ -38,7 +38,13 @@ export const authService = {
 
   /** GitHub OAuth — obtener URL de autorización */
   getGitHubAuthUrl: () =>
-    apiClient.get<{ authorization_url: string }>("/auth/login/github"),
+    apiClient.post<{ authorization_url: string }>("/auth/login/github", {}),
+
+  /** GitHub OAuth — intercambiar código por tokens JWT (llamado desde la página callback) */
+  gitHubCallback: (code: string, state: string) =>
+    apiClient.get<LoginResponse>(
+      `/auth/login/github/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`,
+    ),
 
   /** RF-14: Refresh silencioso usando cookie HttpOnly */
   refresh: () => apiClient.post<AuthTokens>("/auth/refresh", {}),

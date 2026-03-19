@@ -13,13 +13,14 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob:",
       "font-src 'self'",
-      "connect-src 'self' http://localhost:8000 https://api.ikctl.com",
+      "connect-src 'self' http://localhost:8089 https://api.ikctl.com",
       "frame-ancestors 'none'",
     ].join("; "),
   },
 ];
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   async headers() {
     return [
       {

@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react"
 import { apiClient, ApiError } from "@/lib/apiClient"
+import { authService } from "@/features/auth/services/authService"
 import type { AuthTokens, LoginResponse } from "@/types/api"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -23,6 +24,8 @@ interface AuthContextValue {
   isLoading: boolean
   /** Intenta login; si requires_2fa=true devuelve temp_token */
   login: (email: string, password: string) => Promise<LoginResponse>
+  /** Completa el flujo GitHub OAuth: intercambia code+state por tokens */
+  completeGitHubLogin: (code: string, state: string) => Promise<void>
   logout: () => Promise<void>
   /** Refresh silencioso — llama al backend con la cookie HttpOnly */
   silentRefresh: () => Promise<void>
@@ -88,6 +91,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [scheduleRefresh],
   )
 
+  const completeGitHubLogin = useCallback(
+    async (code: string, state: string): Promise<void> => {
+      const response = await authService.gitHubCallback(code, state)
+      if (response.access_token) {
+        setAccessToken(response.access_token)
+        scheduleRefresh()
+      }
+    },
+    [scheduleRefresh],
+  )
+
   const logout = useCallback(async () => {
     try {
       await apiClient.post("/auth/logout", {})
@@ -109,6 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: !!accessToken,
         isLoading,
         login,
+        completeGitHubLogin,
         logout,
         silentRefresh,
       }}

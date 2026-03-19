@@ -20,7 +20,7 @@ function isAuthRoute(pathname: string): boolean {
  * La validación real ocurre en el AuthContext al montar la app,
  * que hace un refresh silencioso para obtener el access_token.
  */
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   const hasSession = request.cookies.has("refresh_token")
 
