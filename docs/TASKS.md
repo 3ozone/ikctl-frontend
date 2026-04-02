@@ -100,3 +100,46 @@
 | Fase 5 | Feature Profile | ✅ Completada |
 | Fase 6 | Accesibilidad y UX | ⚪ Parcial (T-42, T-43 ✅ — T-44, T-45 requieren QA manual) |
 | Fase 7 | GitHub OAuth | ✅ Completada |
+| Fase 8 | Feature Credentials | ⚪ Pendiente |
+| Fase 9 | Feature Servers | ⚪ Pendiente |
+| Fase 10 | Feature Groups | ⚪ Pendiente |
+
+---
+
+## Fase 8: Feature Credentials
+
+- [x] **T-51**: Schema Zod `credentialSchema` — campos `name`, `type` (enum `ssh|git_https|git_ssh`), `username`, `password`, `private_key` con validaciones (RF-22, RF-23, RN) ✅
+- [x] **T-52**: Types TS — añadir `CredentialResponse`, `CredentialListResponse` en `types/api.ts` ✅
+- [x] **T-53**: `credentialsService.ts` — `list(page, perPage)`, `get(id)`, `create(body)`, `update(id, body)`, `delete(id)` usando `apiClient` (RF-21 a RF-26) ✅
+- [x] **T-54**: `useCredentials.ts` + `useCreateCredential.ts` + `useUpdateCredential.ts` + `useDeleteCredential.ts` ✅
+- [x] **T-55**: `CredentialsList.tsx` — tabla paginada (nombre, tipo, username, fecha) + estados vacío y carga (RF-21, RF-26, RNF-16) ✅
+- [x] **T-56**: `CredentialForm.tsx` — formulario modal create/edit, campo `type` cambia campos visibles (ssh muestra `private_key`, otros `password`) (RF-22, RF-23, RF-24) ✅
+- [ ] **T-57**: Páginas `(dashboard)/credentials/page.tsx` — composición lista + form + delete confirmation (RF-25) ⛔
+- [ ] **T-58**: TypeCheck + lint pass (`tsc --noEmit && eslint`) ⛔
+
+---
+
+## Fase 9: Feature Servers
+
+- [ ] **T-59**: Schemas Zod — `registerServerSchema` (remote), `registerLocalServerSchema`, `updateServerSchema`, `adHocCommandSchema` con validaciones de RN ⛔
+- [ ] **T-60**: Types TS — añadir `ServerResponse`, `ServerListResponse`, `HealthCheckResponse`, `AdHocCommandResponse` en `types/api.ts` ⛔
+- [ ] **T-61**: `serversService.ts` — `list`, `get`, `create` (remote/local discriminador), `update`, `delete`, `toggle`, `health`, `command` (RF-27 a RF-38) ⛔
+- [ ] **T-62**: Hooks — `useServers`, `useCreateServer`, `useUpdateServer`, `useDeleteServer`, `useToggleServer`, `useServerHealth`, `useAdHocCommand` ⛔
+- [ ] **T-63**: `ServersList.tsx` — tabla paginada con badge de estado/tipo, servidores deshabilitados diferenciados (RF-27, RF-38) ⛔
+- [ ] **T-64**: `RegisterServerForm.tsx` — formulario con discriminador local/remote (muestra/oculta campos según tipo) (RF-28, RF-29, RF-30) ⛔
+- [ ] **T-65**: `ServerDetail.tsx` + `ServerHealthCard.tsx` + `AdHocCommandPanel.tsx` — detalle + health check + ejecución con salida `<pre>` (RF-31, RF-35, RF-36, RF-37, RNF-18) ⛔
+- [ ] **T-66**: Páginas `(dashboard)/servers/page.tsx` + `(dashboard)/servers/[id]/page.tsx` ⛔
+- [ ] **T-67**: TypeCheck + lint pass ⛔
+
+---
+
+## Fase 10: Feature Groups
+
+- [ ] **T-68**: Schema Zod `groupSchema` — `name`, `description`, `server_ids` con validaciones de RN ⛔
+- [ ] **T-69**: Types TS — añadir `GroupResponse`, `GroupListResponse` en `types/api.ts` ⛔
+- [ ] **T-70**: `groupsService.ts` — `list`, `get`, `create`, `update`, `delete` ⛔
+- [ ] **T-71**: Hooks — `useGroups`, `useCreateGroup`, `useUpdateGroup`, `useDeleteGroup` ⛔
+- [ ] **T-72**: `GroupsList.tsx` — tabla paginada (nombre, descripción, nº servidores) (RF-39) ⛔
+- [ ] **T-73**: `GroupForm.tsx` — formulario create/edit con multi-select de servidores activos del usuario (RF-40, RF-41, RF-43) ⛔
+- [ ] **T-74**: Página `(dashboard)/groups/page.tsx` — lista + form + delete con error 409 (RF-42) ⛔
+- [ ] **T-75**: TypeCheck + lint pass ⛔

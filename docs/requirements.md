@@ -53,6 +53,44 @@
 | RF-19 | El usuario puede cambiar su contraseña validando la actual |
 | RF-20 | El usuario puede activar/desactivar 2FA desde el perfil |
 
+### Credenciales
+
+| ID | Requisito |
+|----|-----------|
+| RF-21 | El usuario puede ver la lista paginada de sus credenciales (nombre, tipo, username, fecha) |
+| RF-22 | El usuario puede crear una credencial de tipo `ssh`, `git_https` o `git_ssh` |
+| RF-23 | Al crear credencial tipo `ssh` con clave privada, se acepta texto PEM en un textarea |
+| RF-24 | El usuario puede editar nombre, username, contraseña y clave privada de una credencial |
+| RF-25 | El usuario puede eliminar una credencial; si tiene servidores asociados (API 409) se muestra error |
+| RF-26 | La lista de credenciales nunca muestra `password` ni `private_key` |
+
+### Servidores
+
+| ID | Requisito |
+|----|-----------|
+| RF-27 | El usuario puede ver la lista paginada de sus servidores (nombre, tipo, estado, host) |
+| RF-28 | El usuario puede registrar un servidor remoto (nombre, host, puerto, credencial, descripción) |
+| RF-29 | El usuario puede registrar un servidor local (nombre, descripción) |
+| RF-30 | Solo puede existir un servidor local por usuario; un segundo registro muestra error (API 409) |
+| RF-31 | El usuario puede ver el detalle de un servidor |
+| RF-32 | El usuario puede editar nombre, host, puerto, credencial y descripción de un servidor |
+| RF-33 | El usuario puede eliminar un servidor; si está en uso (API 409) se muestra error descriptivo |
+| RF-34 | El usuario puede habilitar o deshabilitar un servidor (toggle) |
+| RF-35 | El usuario puede lanzar un health check y ver el resultado (latencia ms, OS detectado) |
+| RF-36 | El usuario puede ejecutar un comando ad-hoc (`command`, `sudo`, `timeout`) en un servidor |
+| RF-37 | El resultado del comando muestra `stdout`, `stderr` y `exit_code` en bloques diferenciados |
+| RF-38 | Los servidores deshabilitados aparecen visualmente diferenciados (badge de estado) |
+
+### Grupos de Servidores
+
+| ID | Requisito |
+|----|-----------|
+| RF-39 | El usuario puede ver la lista de sus grupos (nombre, descripción, número de servidores) |
+| RF-40 | El usuario puede crear un grupo con nombre, descripción y seleccionar servidores |
+| RF-41 | El usuario puede editar nombre, descripción y miembros de un grupo |
+| RF-42 | El usuario puede eliminar un grupo; si está vinculado a pipelines (API 409) se muestra error |
+| RF-43 | Al seleccionar servidores en un grupo solo se ofrecen los servidores activos del usuario |
+
 ---
 
 ## Reglas No Funcionales (RNF)
@@ -76,6 +114,9 @@
 | RNF-08 | Código del formulario de login < 50KB (gzip) |
 | RNF-09 | Los Server Components gestionan las rutas protegidas, no el cliente |
 | RNF-10 | Sin waterfalls de datos: usar `Promise.all` para fetches paralelos cuando aplique |
+| RNF-16 | Las listas paginadas de credenciales, servidores y grupos usan `page` y `per_page` como query params |
+| RNF-17 | Las credenciales nunca exponen `password` ni `private_key` en ninguna respuesta del frontend |
+| RNF-18 | Los resultados de comandos ad-hoc se muestran en `<pre>` con scroll horizontal y fuente monoespaciada |
 
 ### Accesibilidad
 
@@ -100,14 +141,22 @@
 | `password` | Mínimo 8 caracteres, 1 mayúscula, 1 minúscula, 1 número |
 | `code` (2FA) | Exactamente 6 dígitos numéricos |
 | `new_password` | Mismas reglas que `password`, distinto a la contraseña actual |
+| `name` (credential/server/group) | Requerido, 1-255 caracteres |
+| `type` (credential) | Obligatorio, valor enum: `ssh` \| `git_https` \| `git_ssh` |
+| `host` (server remoto) | Requerido para tipo `remote`, 1-255 caracteres |
+| `port` (server) | Entero 1-65535, default 22 |
+| `command` (ad-hoc) | Requerido, 1-2048 caracteres |
+| `timeout` (ad-hoc) | Entero 1-600 segundos, default 30 |
+| `server_ids` (group) | Lista de UUIDs válidos (puede ser vacía) |
 
 ### Manejo de Errores de API
 
 | Código HTTP | Comportamiento en UI |
 |-------------|----------------------|
 | `401` | Credenciales inválidas — error genérico bajo el formulario (no revelar cuál campo) |
-| `403` | Email no verificado — banner con botón de reenvío |
-| `409` | Email duplicado — error bajo el campo email |
+| `403` | Email no verificado / no propietario del recurso — banner o mensaje descriptivo |
+| `404` | Recurso no encontrado — mensaje "No encontrado" + botón volver a la lista |
+| `409` | Conflicto (email duplicado, en uso, solo un local) — mensaje descriptivo bajo el campo o como toast |
 | `422` | Validación servidor — mapear errores al campo correspondiente |
 | `429` | Rate limit — mensaje + temporizador de cuenta atrás |
 | `503` | Error infra — toast de error con opción de reintentar |

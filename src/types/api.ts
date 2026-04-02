@@ -69,3 +69,26 @@ export interface ApiValidationError {
 export interface MessageResponse {
   message: string
 }
+
+// ─── Pagination ────────────────────────────────────────────────────────────
+
+export interface PaginatedResponse<T> {
+  items: T[]
+  total: number
+  page: number
+  per_page: number
+}
+
+// ─── Credentials ───────────────────────────────────────────────────────────
+
+export interface CredentialResponse {
+  credential_id: string
+  user_id: string
+  name: string
+  credential_type: "ssh" | "git_https" | "git_ssh"
+  username: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type CredentialListResponse = PaginatedResponse<CredentialResponse>

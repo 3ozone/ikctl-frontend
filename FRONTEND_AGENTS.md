@@ -264,8 +264,8 @@ useEffect(() => {
 ### Middleware Next.js
 
 ```typescript
-// middleware.ts (edge)
-export function middleware(request: NextRequest) {
+// src/proxy.ts (Next.js 16 — la función y el fichero se llaman proxy, no middleware)
+export function proxy(request: NextRequest) {
   const hasSession = request.cookies.has('refresh_token') // solo verifica existencia
   if (!hasSession && isProtectedRoute(request.nextUrl.pathname)) {
     return NextResponse.redirect(new URL('/login', request.url))
@@ -339,19 +339,45 @@ export function LoginForm() {
 
 ---
 
+## 🧪 Estructura de Tests
+
+Los tests viven en `tests/` (separados de `src/`), espejando la estructura de features:
+
+```bash
+tests/
+├── unit/                  # Tests de schemas, servicios y hooks (sin DOM)
+│   ├── credentials/
+│   │   ├── credentialSchema.test.ts
+│   │   └── credentialsService.test.ts
+│   ├── servers/
+│   └── groups/
+└── components/            # Tests de componentes React (con renderHook / render)
+    ├── credentials/
+    ├── servers/
+    └── groups/
+```
+
+**Reglas:**
+- `tests/unit/` → schemas Zod y servicios. Sin DOM, sin render.
+- `tests/components/` → hooks con `renderHook`, componentes con `render` + `userEvent`.
+- Imports usan siempre el alias `@/` (nunca rutas relativas `../../`).
+- Los ficheros E2E (Playwright) irán en `e2e/` cuando se añadan, fuera de `tests/`.
+
+---
+
 ## 📚 Stack Tecnológico Elegido
 
 | Categoría | Librería | Versión | ADR |
 |-----------|----------|---------|-----|
-| Framework | Next.js | 15.x | [ADR-001](docs/adrs/001-nextjs-app-router.md) |
+| Framework | Next.js | 16.x | [ADR-001](docs/adrs/001-nextjs-app-router.md) |
 | Lenguaje | TypeScript | 5.x | ADR-001 |
 | Estilos | Tailwind CSS | 4.x | [ADR-004](docs/adrs/004-styling.md) |
 | Componentes UI | shadcn/ui | latest | ADR-004 |
 | Formularios | React Hook Form | 7.x | [ADR-002](docs/adrs/002-form-validation.md) |
-| Validación | Zod | 3.x | ADR-002 |
+| Validación | Zod | 4.x | ADR-002 |
 | Sesión | Contexto React + HttpOnly Cookie | — | [ADR-003](docs/adrs/003-session-management.md) |
-| Testing | Vitest + Testing Library | latest | — |
-| Linting | ESLint + Prettier | — | — |
+| Testing | Vitest 4.x + Testing Library 16.x | — | — |
+| Linting | ESLint | — | — |
 
 ---
 
