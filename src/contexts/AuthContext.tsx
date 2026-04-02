@@ -9,7 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react"
-import { apiClient, ApiError } from "@/lib/apiClient"
+import { apiClient, ApiError, setAccessToken } from "@/lib/apiClient"
 import { authService } from "@/features/auth/services/authService"
 import type { AuthTokens, LoginResponse } from "@/types/api"
 
@@ -41,10 +41,15 @@ const REFRESH_AHEAD_MS = 60 * 1000 // refrescar 60s antes de expirar
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [accessToken, setAccessToken] = useState<string | null>(null)
+  const [accessToken, setAccessTokenState] = useState<string | null>(null)
   const [tempToken, setTempToken] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Sincronizar el token del módulo apiClient con el estado React
+  useEffect(() => {
+    setAccessToken(accessToken)
+  }, [accessToken])
 
   /** Programa el próximo refresh proactivo */
   const scheduleRefresh = useCallback(() => {
@@ -57,11 +62,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const silentRefresh = useCallback(async () => {
     try {
       const tokens = await apiClient.post<AuthTokens>("/auth/refresh", {})
-      setAccessToken(tokens.access_token)
+      setAccessTokenState(tokens.access_token)
       scheduleRefresh()
     } catch {
       // refresh falló → sesión expirada, limpiar
-      setAccessToken(null)
+      setAccessTokenState(null)
     }
   }, [scheduleRefresh])
 
@@ -80,7 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         password,
       })
       if (!response.requires_2fa && response.access_token) {
-        setAccessToken(response.access_token)
+        setAccessTokenState(response.access_token)
         scheduleRefresh()
       } else if (response.requires_2fa && response.temp_token) {
         // temp_token en memoria del contexto — nunca en URL ni localStorage
@@ -95,7 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (code: string, state: string): Promise<void> => {
       const response = await authService.gitHubCallback(code, state)
       if (response.access_token) {
-        setAccessToken(response.access_token)
+        setAccessTokenState(response.access_token)
         scheduleRefresh()
       }
     },
@@ -109,7 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // si el token ya expiró en el servidor, ignorar el error
       if (!(err instanceof ApiError && err.status === 401)) throw err
     } finally {
-      setAccessToken(null)
+      setAccessTokenState(null)
       setTempToken(null)
       if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current)
     }

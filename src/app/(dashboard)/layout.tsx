@@ -42,6 +42,15 @@ export default function DashboardLayout({
             <Link href="/dashboard" className="text-muted-foreground hover:text-foreground">
               Dashboard
             </Link>
+            <Link href="/credentials" className="text-muted-foreground hover:text-foreground">
+              Credenciales
+            </Link>
+            <Link href="/servers" className="text-muted-foreground hover:text-foreground">
+              Servidores
+            </Link>
+            <Link href="/groups" className="text-muted-foreground hover:text-foreground">
+              Grupos
+            </Link>
             <Link href="/profile" className="text-muted-foreground hover:text-foreground">
               Perfil
             </Link>

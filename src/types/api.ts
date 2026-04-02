@@ -92,3 +92,52 @@ export interface CredentialResponse {
 }
 
 export type CredentialListResponse = PaginatedResponse<CredentialResponse>
+
+// ─── Server Responses ─────────────────────────────────────────────────────────
+
+export interface ServerResponse {
+  id: string
+  user_id: string
+  name: string
+  type: "remote" | "local"
+  host: string | null
+  port: number | null
+  credential_id: string | null
+  description: string | null
+  status: "active" | "inactive"
+  os_id: string | null
+  os_version: string | null
+  os_name: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type ServerListResponse = PaginatedResponse<ServerResponse>
+
+export interface HealthCheckResponse {
+  status: "online" | "offline"
+  latency_ms: number | null
+  os_id: string | null
+  os_version: string | null
+  os_name: string | null
+}
+
+export interface AdHocCommandResponse {
+  stdout: string
+  stderr: string
+  exit_code: number
+}
+
+// ─── Group Responses ──────────────────────────────────────────────────────────
+
+export interface GroupResponse {
+  id: string
+  user_id: string
+  name: string
+  description: string | null
+  server_ids: string[]
+  created_at: string
+  updated_at: string
+}
+
+export type GroupListResponse = PaginatedResponse<GroupResponse>

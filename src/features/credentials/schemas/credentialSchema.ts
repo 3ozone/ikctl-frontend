@@ -24,21 +24,22 @@ export const createCredentialSchema = z
       .optional(),
     private_key: z.string().optional(),
   })
-  .refine(
-    (data) => {
-      if (data.type === "ssh") return true // ssh puede usar password o private_key
-      if (data.type === "git_https") return !!data.username && !!data.password
-      if (data.type === "git_ssh") return !!data.private_key
-      return true
-    },
-    (data) => ({
-      message:
-        data.type === "git_https"
-          ? "git_https requiere usuario y contraseña"
-          : "git_ssh requiere una clave privada",
-      path: data.type === "git_https" ? ["password"] : ["private_key"],
-    }),
-  )
+  .superRefine((data, ctx) => {
+    if (data.type === "git_https" && (!data.username || !data.password)) {
+      ctx.addIssue({
+        code: "custom",
+        message: "git_https requiere usuario y contraseña",
+        path: ["password"],
+      })
+    }
+    if (data.type === "git_ssh" && !data.private_key) {
+      ctx.addIssue({
+        code: "custom",
+        message: "git_ssh requiere una clave privada",
+        path: ["private_key"],
+      })
+    }
+  })
 
 export const updateCredentialSchema = z.object({
   name: z

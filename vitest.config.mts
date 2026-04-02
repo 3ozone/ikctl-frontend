@@ -10,10 +10,7 @@ export default defineConfig({
     include: [
       'tests/**/*.{test,spec}.{ts,tsx}',
     ],
-    environmentMatchPatterns: [
-      [/tests\/unit\//, 'node'],
-      [/tests\/components\//, 'happy-dom'],
-    ],
+
     coverage: {
       provider: 'v8',
       include: ['src/features/**/*.{ts,tsx}', 'src/lib/**/*.ts'],

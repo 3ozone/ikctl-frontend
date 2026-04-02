@@ -11,7 +11,7 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import { buttonVariants } from "@/components/ui/button"
 import { useAuthContext } from "@/contexts/AuthContext"
 import { ApiError } from "@/lib/apiClient"
 
@@ -98,9 +98,9 @@ function GitHubCallbackContent() {
         >
           {errorMessage}
         </div>
-        <Button asChild className="w-full">
-          <Link href="/login">Volver al inicio de sesión</Link>
-        </Button>
+        <Link href="/login" className={buttonVariants({ className: "w-full" })}>
+          Volver al inicio de sesión
+        </Link>
       </CardContent>
     </Card>
   )

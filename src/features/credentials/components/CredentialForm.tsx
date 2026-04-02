@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
-import { useForm } from "react-hook-form"
+import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import {
   createCredentialSchema,
@@ -85,7 +85,7 @@ export function CredentialForm({ credential, onSuccess, onCancel }: CredentialFo
 
   // ── Tipo seleccionado (solo modo creación) ────────────────────────────────────
 
-  const selectedType = createForm.watch("type")
+  const selectedType = useWatch({ control: createForm.control, name: "type" })
 
   // ─── Render ──────────────────────────────────────────────────────────────────
 

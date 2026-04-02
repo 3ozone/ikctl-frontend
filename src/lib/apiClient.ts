@@ -3,6 +3,14 @@ import type { ApiErrorBody } from "@/types/api"
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1"
 
+// ─── Token storage (módulo-nivel, nunca persiste en disco) ────────────────────
+
+let _accessToken: string | null = null
+
+export function setAccessToken(token: string | null) {
+  _accessToken = token
+}
+
 // ─── Error class ──────────────────────────────────────────────────────────────
 
 export class ApiError extends Error {
@@ -33,6 +41,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     ...restOptions,
     headers: {
       "Content-Type": "application/json",
+      ...(_accessToken ? { Authorization: `Bearer ${_accessToken}` } : {}),
       ...optionHeaders,
     },
   })
@@ -70,6 +79,13 @@ export const apiClient = {
     request<T>(path, {
       method: "PUT",
       body: JSON.stringify(body),
+      headers,
+    }),
+
+  patch: <T>(path: string, body?: unknown, headers?: HeadersInit) =>
+    request<T>(path, {
+      method: "PATCH",
+      body: body !== undefined ? JSON.stringify(body) : undefined,
       headers,
     }),
 
