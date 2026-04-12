@@ -13,7 +13,7 @@ vi.mock("@/lib/apiClient", () => ({
 }))
 
 const mockGroup: GroupResponse = {
-  id: "grp-123",
+  group_id: "grp-123",
   user_id: "user-abc",
   name: "Production Cluster",
   description: "Servidores de producción",

@@ -68,8 +68,8 @@ function ServerRow({ server, onEdit, onDelete, onToggle, isDeleting, isToggling 
     >
       <td className="py-3 px-4 text-sm font-medium">{server.name}</td>
       <td className="py-3 px-4">
-        <Badge variant={server.type === "local" ? "outline" : "secondary"}>
-          {server.type}
+        <Badge variant={server.server_type === "local" ? "outline" : "secondary"}>
+          {server.server_type}
         </Badge>
       </td>
       <td className="py-3 px-4">
@@ -93,7 +93,7 @@ function ServerRow({ server, onEdit, onDelete, onToggle, isDeleting, isToggling 
           <Button
             variant="outline"
             size="sm"
-            onClick={() => onToggle(server.id)}
+            onClick={() => onToggle(server.server_id)}
             disabled={isToggling}
             aria-busy={isToggling}
             aria-label={`${isInactive ? "Habilitar" : "Deshabilitar"} servidor ${server.name}`}
@@ -103,7 +103,7 @@ function ServerRow({ server, onEdit, onDelete, onToggle, isDeleting, isToggling 
           <Button
             variant="destructive"
             size="sm"
-            onClick={() => onDelete(server.id)}
+            onClick={() => onDelete(server.server_id)}
             disabled={isDeleting}
             aria-busy={isDeleting}
             aria-label={`Eliminar servidor ${server.name}`}
@@ -199,7 +199,7 @@ export function ServersList({
           <tbody>
             {servers.map((server) => (
               <ServerRow
-                key={server.id}
+                key={server.server_id}
                 server={server}
                 onEdit={onEdit}
                 onDelete={handleDelete}

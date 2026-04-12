@@ -76,7 +76,7 @@ export function GroupForm({ group, onSuccess, onCancel }: GroupFormProps) {
 
   function handleUpdate(values: UpdateGroupFormValues) {
     if (!group) return
-    updateGroup(group.id, values, onSuccess)
+    updateGroup(group.group_id, values, onSuccess)
   }
 
   // ── Render ────────────────────────────────────────────────────────────────────
@@ -136,11 +136,11 @@ export function GroupForm({ group, onSuccess, onCancel }: GroupFormProps) {
           <Label>Servidores</Label>
           <div className="mt-2 space-y-2 rounded-md border p-3 max-h-48 overflow-y-auto">
             {activeServers.map((server) => (
-              <label key={server.id} className="flex items-center gap-2 cursor-pointer text-sm">
+              <label key={server.server_id} className="flex items-center gap-2 cursor-pointer text-sm">
                 <input
                   type="checkbox"
-                  checked={selectedIds.includes(server.id)}
-                  onChange={() => toggleServer(server.id)}
+                  checked={selectedIds.includes(server.server_id)}
+                  onChange={() => toggleServer(server.server_id)}
                   aria-label={server.name}
                 />
                 <span>{server.name}</span>

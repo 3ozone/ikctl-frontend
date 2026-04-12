@@ -24,7 +24,7 @@ const mockServer: ServerResponse = {
   id: "srv-001",
   user_id: "user-abc",
   name: "web-01",
-  type: "remote",
+  server_type: "remote",
   host: "192.168.1.10",
   port: 22,
   credential_id: null,

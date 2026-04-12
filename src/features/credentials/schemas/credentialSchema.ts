@@ -25,6 +25,22 @@ export const createCredentialSchema = z
     private_key: z.string().optional(),
   })
   .superRefine((data, ctx) => {
+    if (data.type === "ssh") {
+      if (!data.username) {
+        ctx.addIssue({
+          code: "custom",
+          message: "ssh requiere un usuario",
+          path: ["username"],
+        })
+      }
+      if (!data.password && !data.private_key) {
+        ctx.addIssue({
+          code: "custom",
+          message: "ssh requiere contraseña o clave privada",
+          path: ["password"],
+        })
+      }
+    }
     if (data.type === "git_https" && (!data.username || !data.password)) {
       ctx.addIssue({
         code: "custom",

@@ -13,6 +13,7 @@ import {
 } from "../schemas/serverSchema"
 import { useCreateServer } from "../hooks/useCreateServer"
 import { useUpdateServer } from "../hooks/useUpdateServer"
+import { useCredentials } from "@/features/credentials/hooks/useCredentials"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -36,6 +37,8 @@ export function RegisterServerForm({ server, onSuccess, onCancel }: RegisterServ
 
   const isPending = isCreating || isUpdating
   const error = createError ?? updateError
+
+  const { credentials } = useCredentials(1, 100)
 
   // ── Formulario creación (remote) ─────────────────────────────────────────────
 
@@ -76,6 +79,13 @@ export function RegisterServerForm({ server, onSuccess, onCancel }: RegisterServ
     }
   }, [server, updateForm])
 
+  // Re-sincroniza el select de credencial cuando las opciones cargan tarde (async)
+  useEffect(() => {
+    if (server && credentials && credentials.length > 0) {
+      updateForm.setValue("credential_id", server.credential_id ?? "")
+    }
+  }, [credentials, server, updateForm])
+
   // ── Tipo seleccionado (solo modo creación) ────────────────────────────────────
 
   // usamos un campo separado para el selector de tipo
@@ -96,13 +106,13 @@ export function RegisterServerForm({ server, onSuccess, onCancel }: RegisterServ
 
   function handleUpdate(values: UpdateServerFormValues) {
     if (!server) return
-    updateServer(server.id, values, onSuccess)
+    updateServer(server.server_id, values, onSuccess)
   }
 
   // ─── Modo edición ─────────────────────────────────────────────────────────────
 
   if (isEditMode) {
-    const isLocal = server.type === "local"
+    const isLocal = server.server_type === "local"
 
     return (
       <form onSubmit={updateForm.handleSubmit(handleUpdate)} noValidate>
@@ -135,6 +145,21 @@ export function RegisterServerForm({ server, onSuccess, onCancel }: RegisterServ
             <div className="mb-4">
               <Label htmlFor="edit-port">Puerto</Label>
               <Input id="edit-port" type="number" {...updateForm.register("port")} />
+            </div>
+            <div className="mb-4">
+              <Label htmlFor="edit-credential">Credencial</Label>
+              <select
+                id="edit-credential"
+                className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+                {...updateForm.register("credential_id")}
+              >
+                <option value="">Sin credencial asignada</option>
+                {credentials?.map((c) => (
+                  <option key={c.credential_id} value={c.credential_id}>
+                    {c.name} ({c.credential_type})
+                  </option>
+                ))}
+              </select>
             </div>
           </>
         )}
@@ -229,6 +254,21 @@ export function RegisterServerForm({ server, onSuccess, onCancel }: RegisterServ
               type="number"
               {...createRemoteForm.register("port")}
             />
+          </div>
+          <div className="mb-4">
+            <Label htmlFor="create-credential">Credencial</Label>
+            <select
+              id="create-credential"
+              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+              {...createRemoteForm.register("credential_id")}
+            >
+              <option value="">Sin credencial asignada</option>
+              {credentials?.map((c) => (
+                <option key={c.credential_id} value={c.credential_id}>
+                  {c.name} ({c.credential_type})
+                </option>
+              ))}
+            </select>
           </div>
         </>
       )}

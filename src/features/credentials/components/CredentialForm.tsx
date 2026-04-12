@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import {
@@ -35,6 +35,9 @@ export function CredentialForm({ credential, onSuccess, onCancel }: CredentialFo
 
   const isPending = isCreating || isUpdating
   const error = createError ?? updateError
+
+  // Rastrea si el usuario ha pedido eliminar la clave privada existente
+  const [privateKeyRemoved, setPrivateKeyRemoved] = useState(false)
 
   // ── Formulario creación ──────────────────────────────────────────────────────
 
@@ -112,6 +115,45 @@ export function CredentialForm({ credential, onSuccess, onCancel }: CredentialFo
           )}
         </div>
 
+        {credential.credential_type === "ssh" && (
+          <>
+            <div className="mb-4">
+              <Label htmlFor="edit-username">Usuario</Label>
+              <Input id="edit-username" {...updateForm.register("username")} />
+            </div>
+            <div className="mb-4">
+              <Label htmlFor="edit-password">Contraseña</Label>
+              <Input id="edit-password" type="password" {...updateForm.register("password")} />
+            </div>
+            <div className="mb-4">
+              <Label htmlFor="edit-private-key-ssh">Clave privada (alternativa a contraseña)</Label>
+              {credential.has_private_key && !privateKeyRemoved ? (
+                <div className="flex items-center gap-3 rounded-md border border-input bg-muted/40 px-3 py-2 text-sm">
+                  <span className="text-green-600">✓ Clave privada configurada</span>
+                  <button
+                    type="button"
+                    className="ml-auto text-xs text-red-600 hover:underline"
+                    onClick={() => {
+                      setPrivateKeyRemoved(true)
+                      updateForm.setValue("private_key", "")
+                    }}
+                  >
+                    Eliminar
+                  </button>
+                </div>
+              ) : (
+                <textarea
+                  id="edit-private-key-ssh"
+                  rows={6}
+                  className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm font-mono"
+                  placeholder="Pega aquí la nueva clave privada (opcional)"
+                  {...updateForm.register("private_key")}
+                />
+              )}
+            </div>
+          </>
+        )}
+
         {credential.credential_type === "git_https" && (
           <>
             <div className="mb-4">
@@ -128,12 +170,29 @@ export function CredentialForm({ credential, onSuccess, onCancel }: CredentialFo
         {credential.credential_type === "git_ssh" && (
           <div className="mb-4">
             <Label htmlFor="edit-private-key">Clave privada</Label>
-            <textarea
-              id="edit-private-key"
-              rows={6}
-              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm font-mono"
-              {...updateForm.register("private_key")}
-            />
+            {credential.has_private_key && !privateKeyRemoved ? (
+              <div className="flex items-center gap-3 rounded-md border border-input bg-muted/40 px-3 py-2 text-sm">
+                <span className="text-green-600">✓ Clave privada configurada</span>
+                <button
+                  type="button"
+                  className="ml-auto text-xs text-red-600 hover:underline"
+                  onClick={() => {
+                    setPrivateKeyRemoved(true)
+                    updateForm.setValue("private_key", "")
+                  }}
+                >
+                  Eliminar
+                </button>
+              </div>
+            ) : (
+              <textarea
+                id="edit-private-key"
+                rows={6}
+                className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm font-mono"
+                placeholder="Pega aquí la nueva clave privada"
+                {...updateForm.register("private_key")}
+              />
+            )}
           </div>
         )}
 
@@ -187,6 +246,34 @@ export function CredentialForm({ credential, onSuccess, onCancel }: CredentialFo
           ))}
         </select>
       </div>
+
+      {selectedType === "ssh" && (
+        <>
+          <div className="mb-4">
+            <Label htmlFor="create-username">Usuario</Label>
+            <Input id="create-username" {...createForm.register("username")} />
+            {createForm.formState.errors.username && (
+              <p className="mt-1 text-xs text-red-600">{createForm.formState.errors.username.message}</p>
+            )}
+          </div>
+          <div className="mb-4">
+            <Label htmlFor="create-password">Contraseña</Label>
+            <Input id="create-password" type="password" {...createForm.register("password")} />
+            {createForm.formState.errors.password && (
+              <p className="mt-1 text-xs text-red-600">{createForm.formState.errors.password.message}</p>
+            )}
+          </div>
+          <div className="mb-4">
+            <Label htmlFor="create-private-key-ssh">Clave privada (alternativa a contraseña)</Label>
+            <textarea
+              id="create-private-key-ssh"
+              rows={6}
+              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm font-mono"
+              {...createForm.register("private_key")}
+            />
+          </div>
+        </>
+      )}
 
       {selectedType === "git_https" && (
         <>

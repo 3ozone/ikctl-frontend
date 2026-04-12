@@ -87,6 +87,7 @@ export interface CredentialResponse {
   name: string
   credential_type: "ssh" | "git_https" | "git_ssh"
   username: string | null
+  has_private_key: boolean
   created_at: string
   updated_at: string
 }
@@ -96,10 +97,10 @@ export type CredentialListResponse = PaginatedResponse<CredentialResponse>
 // ─── Server Responses ─────────────────────────────────────────────────────────
 
 export interface ServerResponse {
-  id: string
+  server_id: string
   user_id: string
   name: string
-  type: "remote" | "local"
+  server_type: "remote" | "local"
   host: string | null
   port: number | null
   credential_id: string | null
@@ -131,7 +132,7 @@ export interface AdHocCommandResponse {
 // ─── Group Responses ──────────────────────────────────────────────────────────
 
 export interface GroupResponse {
-  id: string
+  group_id: string
   user_id: string
   name: string
   description: string | null

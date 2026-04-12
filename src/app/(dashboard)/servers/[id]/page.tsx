@@ -45,7 +45,7 @@ export default function ServerDetailPage({ params }: ServerDetailPageProps) {
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold">{server.name}</h1>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Badge variant="secondary">{server.type}</Badge>
+          <Badge variant="secondary">{server.server_type}</Badge>
           <Badge variant={server.status === "active" ? "default" : "outline"}>
             {server.status}
           </Badge>

@@ -56,12 +56,13 @@ describe("CredentialForm", () => {
     expect(screen.getByRole("button", { name: /cancelar/i })).toBeDefined()
   })
 
-  it("el tipo ssh no muestra campos adicionales", () => {
+  it("el tipo ssh muestra campos de usuario, contraseña y clave privada", () => {
     render(<CredentialForm onSuccess={onSuccess} onCancel={onCancel} />)
 
-    // ssh es el valor por defecto
-    expect(screen.queryByLabelText(/contraseña/i)).toBeNull()
-    expect(screen.queryByLabelText(/clave privada/i)).toBeNull()
+    // ssh es el valor por defecto y muestra sus campos específicos
+    expect(screen.getByLabelText(/usuario/i)).toBeDefined()
+    expect(screen.getByLabelText(/^contraseña$/i)).toBeDefined()
+    expect(screen.getByLabelText(/clave privada/i)).toBeDefined()
   })
 
   it("al seleccionar git_https muestra username y password", async () => {
@@ -89,6 +90,8 @@ describe("CredentialForm", () => {
     render(<CredentialForm onSuccess={onSuccess} onCancel={onCancel} />)
 
     fireEvent.change(screen.getByLabelText(/nombre/i), { target: { value: "nueva-clave" } })
+    fireEvent.change(screen.getByLabelText(/usuario/i), { target: { value: "admin" } })
+    fireEvent.change(screen.getByLabelText(/^contraseña$/i), { target: { value: "s3cr3t" } })
     fireEvent.click(screen.getByRole("button", { name: /guardar/i }))
 
     await waitFor(() => {

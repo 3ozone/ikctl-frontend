@@ -82,6 +82,8 @@ describe("createCredentialSchema", () => {
     const result = createCredentialSchema.safeParse({
       name: "  mi-clave  ",
       type: "ssh",
+      username: "admin",
+      password: "s3cr3t",
     })
     expect(result.success).toBe(true)
     if (result.success) expect(result.data.name).toBe("mi-clave")

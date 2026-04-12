@@ -46,11 +46,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Sincronizar el token del módulo apiClient con el estado React
-  useEffect(() => {
-    setAccessToken(accessToken)
-  }, [accessToken])
-
   /** Programa el próximo refresh proactivo */
   const scheduleRefresh = useCallback(() => {
     if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current)
@@ -62,10 +57,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const silentRefresh = useCallback(async () => {
     try {
       const tokens = await apiClient.post<AuthTokens>("/auth/refresh", {})
+      setAccessToken(tokens.access_token)    // actualiza el módulo inmediatamente
       setAccessTokenState(tokens.access_token)
       scheduleRefresh()
     } catch {
       // refresh falló → sesión expirada, limpiar
+      setAccessToken(null)
       setAccessTokenState(null)
     }
   }, [scheduleRefresh])
@@ -85,6 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         password,
       })
       if (!response.requires_2fa && response.access_token) {
+        setAccessToken(response.access_token)    // actualiza el módulo inmediatamente
         setAccessTokenState(response.access_token)
         scheduleRefresh()
       } else if (response.requires_2fa && response.temp_token) {
@@ -100,6 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (code: string, state: string): Promise<void> => {
       const response = await authService.gitHubCallback(code, state)
       if (response.access_token) {
+        setAccessToken(response.access_token)    // actualiza el módulo inmediatamente
         setAccessTokenState(response.access_token)
         scheduleRefresh()
       }
@@ -114,6 +113,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // si el token ya expiró en el servidor, ignorar el error
       if (!(err instanceof ApiError && err.status === 401)) throw err
     } finally {
+      setAccessToken(null)    // actualiza el módulo inmediatamente
       setAccessTokenState(null)
       setTempToken(null)
       if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current)

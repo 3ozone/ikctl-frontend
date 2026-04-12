@@ -26,7 +26,7 @@ vi.mock("@/features/servers/components/ServersList", () => ({
             id: "srv-001",
             user_id: "user-1",
             name: "web-01",
-            type: "remote",
+            server_type: "remote",
             host: "1.2.3.4",
             port: 22,
             credential_id: null,

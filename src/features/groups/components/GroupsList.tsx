@@ -77,7 +77,7 @@ function GroupRow({ group, onEdit, onDelete, isDeleting }: GroupRowProps) {
           <Button
             variant="destructive"
             size="sm"
-            onClick={() => onDelete(group.id)}
+            onClick={() => onDelete(group.group_id)}
             disabled={isDeleting}
             aria-busy={isDeleting}
             aria-label={`Eliminar grupo ${group.name}`}
@@ -162,7 +162,7 @@ export function GroupsList({
           <tbody>
             {groups.map((group) => (
               <GroupRow
-                key={group.id}
+                key={group.group_id}
                 group={group}
                 onEdit={onEdit}
                 onDelete={handleDelete}

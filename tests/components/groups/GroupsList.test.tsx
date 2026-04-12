@@ -10,7 +10,7 @@ vi.mock("@/features/groups/hooks/useGroups")
 vi.mock("@/features/groups/hooks/useDeleteGroup")
 
 const mockGroup: GroupResponse = {
-  id: "grp-001",
+  group_id: "grp-001",
   user_id: "user-abc",
   name: "Production Cluster",
   description: "Servidores de producción",
@@ -21,7 +21,7 @@ const mockGroup: GroupResponse = {
 
 const mockGroupNoDesc: GroupResponse = {
   ...mockGroup,
-  id: "grp-002",
+  group_id: "grp-002",
   name: "Staging",
   description: null,
   server_ids: [],

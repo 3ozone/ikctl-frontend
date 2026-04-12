@@ -19,7 +19,7 @@ export const registerServerSchema = z.object({
     .min(1, "El puerto debe ser mayor que 0")
     .max(65535, "El puerto no puede superar 65535")
     .default(22),
-  credential_id: z.string().optional(),
+  credential_id: z.string().transform(v => v === "" ? undefined : v).optional(),
   description: z.string().optional(),
 })
 
@@ -57,7 +57,7 @@ export const updateServerSchema = z.object({
     .min(1, "El puerto debe ser mayor que 0")
     .max(65535, "El puerto no puede superar 65535")
     .optional(),
-  credential_id: z.string().optional(),
+  credential_id: z.string().transform(v => v === "" ? undefined : v).optional(),
   description: z.string().optional(),
 })
 

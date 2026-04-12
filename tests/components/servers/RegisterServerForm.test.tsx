@@ -10,10 +10,10 @@ vi.mock("@/features/servers/hooks/useCreateServer")
 vi.mock("@/features/servers/hooks/useUpdateServer")
 
 const mockRemoteServer: ServerResponse = {
-  id: "srv-001",
+  server_id: "srv-001",
   user_id: "user-abc",
   name: "web-01",
-  type: "remote",
+  server_type: "remote",
   host: "192.168.1.10",
   port: 22,
   credential_id: null,
@@ -28,9 +28,9 @@ const mockRemoteServer: ServerResponse = {
 
 const mockLocalServer: ServerResponse = {
   ...mockRemoteServer,
-  id: "srv-002",
+  server_id: "srv-002",
   name: "mi-local",
-  type: "local",
+  server_type: "local",
   host: null as unknown as string,
 }
 
