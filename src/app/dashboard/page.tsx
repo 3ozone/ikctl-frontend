@@ -2,25 +2,31 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { getServers, getOperations } from "@/lib/services";
-import type { Server, Operation } from "@/types";
+import { getServers, getOperations, getKits } from "@/lib/services";
+import type { Server, Operation, Kit } from "@/types";
 import { Card, CardHeader, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { StatCardSkeleton, TableSkeleton } from "@/components/ui/Skeleton";
 
 function operationBadge(status: Operation["status"]) {
-  const map = {
+  const map: Record<Operation["status"], "success" | "error" | "info" | "warning"> = {
     completed: "success",
     failed: "error",
     in_progress: "info",
     pending: "warning",
-  } as const;
+    cancelled: "warning",
+    cancelled_unsafe: "error",
+  };
   return <Badge label={status.replace("_", " ")} variant={map[status]} />;
 }
 
 export default function DashboardPage() {
   const [servers, setServers] = useState<Server[]>([]);
   const [operations, setOperations] = useState<Operation[]>([]);
+  const [kits, setKits] = useState<Kit[]>([]);
+  const [serverTotal, setServerTotal] = useState(0);
+  const [operationTotal, setOperationTotal] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -28,13 +34,21 @@ export default function DashboardPage() {
       .then(([s, o]) => {
         setServers(s.items ?? []);
         setOperations(o.items ?? []);
+        setServerTotal(s.total ?? 0);
+        setOperationTotal(o.total ?? 0);
       })
       .catch(() => {
         setServers([]);
         setOperations([]);
       })
       .finally(() => setLoading(false));
+    getKits(1, 50).then((res) => setKits(res.items ?? [])).catch(() => {});
   }, []);
+
+  const serverName = (id: string) =>
+    servers.find((s) => s.server_id === id)?.name ?? id;
+  const kitName = (id: string) =>
+    kits.find((k) => k.kit_id === id)?.name ?? id;
 
   return (
     <div className="space-y-6">
@@ -46,10 +60,13 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats */}
+      {loading ? (
+        <StatCardSkeleton count={3} />
+      ) : (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard
           label="Total Servers"
-          value={loading ? "…" : String(servers.length)}
+          value={String(serverTotal)}
           icon={
             <svg className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
@@ -58,7 +75,7 @@ export default function DashboardPage() {
         />
         <StatCard
           label="Total Operations"
-          value={loading ? "…" : String(operations.length)}
+          value={String(operationTotal)}
           icon={
             <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -67,15 +84,11 @@ export default function DashboardPage() {
         />
         <StatCard
           label="Active Operations"
-          value={
-            loading
-              ? "…"
-              : String(
-                  operations.filter(
-                    (o) => o.status === "in_progress" || o.status === "pending"
-                  ).length
-                )
-          }
+          value={String(
+            operations.filter(
+              (o) => o.status === "in_progress" || o.status === "pending"
+            ).length
+          )}
           icon={
             <svg className="h-6 w-6 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -83,6 +96,7 @@ export default function DashboardPage() {
           }
         />
       </div>
+      )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Recent servers */}
@@ -97,7 +111,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardBody className="!p-0">
             {loading ? (
-              <p className="px-6 py-4 text-sm text-slate-400">Loading…</p>
+              <TableSkeleton rows={3} cols={2} />
             ) : servers.length === 0 ? (
               <div className="px-6 py-8 text-center">
                 <p className="text-sm text-slate-400">No servers yet.</p>
@@ -110,14 +124,14 @@ export default function DashboardPage() {
             ) : (
               <ul className="divide-y divide-slate-100">
                 {servers.map((s) => (
-                  <li key={s.id} className="flex items-center justify-between px-6 py-3">
+                  <li key={s.server_id} className="flex items-center justify-between px-6 py-3">
                     <div>
                       <p className="text-sm font-medium text-slate-800">{s.name}</p>
                       <p className="text-xs text-slate-400">
-                        {s.user}@{s.host}:{s.port}
+                        {s.user_id}@{s.host}:{s.port}
                       </p>
                     </div>
-                    <Link href={`/dashboard/servers?id=${s.id}`}>
+                    <Link href={`/dashboard/servers/${s.server_id}`}>
                       <Button variant="ghost" size="sm">View</Button>
                     </Link>
                   </li>
@@ -139,7 +153,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardBody className="!p-0">
             {loading ? (
-              <p className="px-6 py-4 text-sm text-slate-400">Loading…</p>
+              <TableSkeleton rows={3} cols={2} />
             ) : operations.length === 0 ? (
               <div className="px-6 py-8 text-center">
                 <p className="text-sm text-slate-400">No operations yet.</p>
@@ -152,13 +166,13 @@ export default function DashboardPage() {
             ) : (
               <ul className="divide-y divide-slate-100">
                 {operations.map((o) => (
-                  <li key={o.id} className="flex items-center justify-between px-6 py-3">
+                  <li key={o.operation_id} className="flex items-center justify-between px-6 py-3">
                     <div>
                       <p className="text-sm font-medium text-slate-800">
-                        {o.kit}
+                        {kitName(o.kit_id)}
                       </p>
                       <p className="text-xs text-slate-400">
-                        {o.server_name ?? o.server_id} ·{" "}
+                        {serverName(o.server_id)} ·{" "}
                         {new Date(o.created_at).toLocaleDateString()}
                       </p>
                     </div>

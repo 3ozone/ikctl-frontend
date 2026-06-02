@@ -1,63 +1,88 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { getOperations, getServers, createOperation, getOperation } from "@/lib/services";
-import type { Operation, Server } from "@/types";
+import { useEffect, useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { getOperations, getServers, createOperation, getOperation, cancelOperation, retryOperation, restoreOperation, getKits } from "@/lib/services";
+import type { Operation, Server, Kit } from "@/types";
 import { Card, CardHeader, CardBody } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Alert } from "@/components/ui/Alert";
-import { Input } from "@/components/ui/Input";
-import { useForm } from "react-hook-form";
+import { Pagination } from "@/components/ui/Pagination";
+import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { TableSkeleton } from "@/components/ui/Skeleton";
 
-const KNOWN_KITS = [
-  "nginx",
-  "docker",
-  "td-agent",
-  "postgresql",
-  "redis",
-  "mysql",
-  "nodejs",
-  "python",
+const PAGE_SIZE = 20;
+const STATUS_OPTIONS: { value: string; label: string }[] = [
+  { value: "", label: "All statuses" },
+  { value: "pending", label: "Pending" },
+  { value: "in_progress", label: "In progress" },
+  { value: "completed", label: "Completed" },
+  { value: "failed", label: "Failed" },
+  { value: "cancelled", label: "Cancelled" },
+  { value: "cancelled_unsafe", label: "Cancelled (unsafe)" },
 ];
 
 const opSchema = z.object({
   server_id: z.string().min(1, "Select a server"),
-  kit: z.string().min(1, "Kit name is required"),
+  kit: z.string().min(1, "Select a kit"),
   sudo: z.boolean().optional(),
+  debug_level: z.enum(["none", "errors", "full"]).optional(),
 });
 type OpForm = z.infer<typeof opSchema>;
 
 function statusBadge(status: Operation["status"]) {
-  const map = {
+  const map: Record<Operation["status"], "success" | "error" | "info" | "warning"> = {
     completed: "success",
     failed: "error",
     in_progress: "info",
     pending: "warning",
-  } as const;
-  return (
-    <Badge
-      label={status.replace("_", " ")}
-      variant={map[status]}
-    />
-  );
+    cancelled: "warning",
+    cancelled_unsafe: "error",
+  };
+  return <Badge label={status.replace(/_/g, " ")} variant={map[status]} />;
 }
 
-export default function OperationsPage() {
+function OperationsPageInner() {
+  const searchParams = useSearchParams();
+  const preselectedKitId = searchParams.get("kit_id");
   const [operations, setOperations] = useState<Operation[]>([]);
   const [servers, setServers] = useState<Server[]>([]);
+  const [kits, setKits] = useState<Kit[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showForm, setShowForm] = useState(false);
+  const [showForm, setShowForm] = useState(!!preselectedKitId);
   const [selected, setSelected] = useState<Operation | null>(null);
   const [pollingId, setPollingId] = useState<string | null>(null);
 
-  const fetchOperations = async () => {
+  // Lookup maps for display names
+  const serverName = (id: string) =>
+    servers.find((s) => s.server_id === id)?.name ?? id;
+  const kitName = (id: string) =>
+    kits.find((k) => k.kit_id === id)?.name ?? id;
+
+  // Filters & pagination
+  const [filterServer, setFilterServer] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+
+  const fetchOperations = async (
+    p = page,
+    srv = filterServer,
+    st = filterStatus,
+  ) => {
+    setLoading(true);
     try {
-      const res = await getOperations();
+      const filters: { server_id?: string; status?: string } = {};
+      if (srv) filters.server_id = srv;
+      if (st) filters.status = st;
+      const res = await getOperations(p, PAGE_SIZE, filters);
       setOperations(res.items ?? []);
+      setTotalPages(Math.ceil((res.total ?? 0) / (res.per_page ?? PAGE_SIZE)));
     } catch {
       setError("Failed to load operations.");
     } finally {
@@ -66,9 +91,28 @@ export default function OperationsPage() {
   };
 
   useEffect(() => {
-    fetchOperations();
+    fetchOperations(1, "", "");
     getServers().then((res) => setServers(res.items ?? [])).catch(() => {});
+    getKits(1, 50).then((res) => setKits(res.items ?? [])).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const handleFilterServer = (v: string) => {
+    setFilterServer(v);
+    setPage(1);
+    fetchOperations(1, v, filterStatus);
+  };
+
+  const handleFilterStatus = (v: string) => {
+    setFilterStatus(v);
+    setPage(1);
+    fetchOperations(1, filterServer, v);
+  };
+
+  const handlePage = (p: number) => {
+    setPage(p);
+    fetchOperations(p, filterServer, filterStatus);
+  };
 
   // Poll for in-progress operation
   useEffect(() => {
@@ -77,10 +121,11 @@ export default function OperationsPage() {
       try {
         const op = await getOperation(pollingId);
         setOperations((prev) =>
-          prev.map((o) => (o.id === pollingId ? op : o))
+          prev.map((o) => (o.operation_id === pollingId ? op : o))
         );
-        if (selected?.id === pollingId) setSelected(op);
-        if (op.status === "completed" || op.status === "failed") {
+        if (selected?.operation_id === pollingId) setSelected(op);
+        const TERMINAL = ["completed", "failed", "cancelled", "cancelled_unsafe"];
+        if (TERMINAL.includes(op.status)) {
           setPollingId(null);
         }
       } catch {
@@ -104,8 +149,35 @@ export default function OperationsPage() {
 
       {error && <Alert variant="error" message={error} />}
 
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3">
+        <select
+          value={filterServer}
+          onChange={(e) => handleFilterServer(e.target.value)}
+          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">All servers</option>
+          {servers.map((s) => (
+            <option key={s.server_id} value={s.server_id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+        <select
+          value={filterStatus}
+          onChange={(e) => handleFilterStatus(e.target.value)}
+          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+        >
+          {STATUS_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
       {loading ? (
-        <p className="text-sm text-slate-400">Loading…</p>
+        <Card><CardBody className="!p-0"><TableSkeleton rows={5} cols={5} /></CardBody></Card>
       ) : operations.length === 0 ? (
         <Card>
           <CardBody className="py-12 text-center">
@@ -147,10 +219,10 @@ export default function OperationsPage() {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {operations.map((op) => (
-                    <tr key={op.id} className="hover:bg-slate-50">
-                      <td className="px-6 py-3 font-medium text-slate-800">{op.kit}</td>
+                    <tr key={op.operation_id} className="hover:bg-slate-50">
+                      <td className="px-6 py-3 font-medium text-slate-800">{kitName(op.kit_id)}</td>
                       <td className="px-6 py-3 text-slate-500">
-                        {op.server_name ?? op.server_id}
+                        {serverName(op.server_id)}
                       </td>
                       <td className="px-6 py-3">{statusBadge(op.status)}</td>
                       <td className="px-6 py-3 text-slate-400">
@@ -166,7 +238,7 @@ export default function OperationsPage() {
                               op.status === "pending" ||
                               op.status === "in_progress"
                             ) {
-                              setPollingId(op.id);
+                              setPollingId(op.operation_id);
                             }
                           }}
                         >
@@ -178,6 +250,7 @@ export default function OperationsPage() {
                 </tbody>
               </table>
             </div>
+            <Pagination page={page} totalPages={totalPages} onPage={handlePage} />
           </CardBody>
         </Card>
       )}
@@ -190,6 +263,18 @@ export default function OperationsPage() {
             setSelected(null);
             setPollingId(null);
           }}
+          onUpdate={(updatedOp) => {
+            setOperations((prev) =>
+              prev.map((o) => (o.operation_id === updatedOp.operation_id ? updatedOp : o))
+            );
+            setSelected(updatedOp);
+            setPollingId(null);
+          }}
+          onRetried={(newOp) => {
+            setOperations((prev) => [newOp, ...prev]);
+            setSelected(newOp);
+            setPollingId(newOp.operation_id);
+          }}
         />
       )}
 
@@ -197,12 +282,14 @@ export default function OperationsPage() {
       {showForm && (
         <RunOperationModal
           servers={servers}
+          kits={kits}
+          initialKitId={preselectedKitId ?? undefined}
           onClose={() => setShowForm(false)}
           onCreated={(op) => {
             setOperations((prev) => [op, ...prev]);
             setShowForm(false);
             setSelected(op);
-            setPollingId(op.id);
+            setPollingId(op.operation_id);
           }}
         />
       )}
@@ -212,27 +299,63 @@ export default function OperationsPage() {
 
 function RunOperationModal({
   servers,
+  kits,
+  initialKitId,
   onClose,
   onCreated,
 }: {
   servers: Server[];
+  kits: Kit[];
+  initialKitId?: string;
   onClose: () => void;
   onCreated: (op: Operation) => void;
 }) {
   const [error, setError] = useState<string | null>(null);
+  const [kitValues, setKitValues] = useState<Record<string, string>>(() => {
+    if (!initialKitId) return {};
+    const kit = kits.find((k) => k.kit_id === initialKitId && !k.is_deleted);
+    if (!kit?.values) return {};
+    return Object.fromEntries(
+      Object.entries(kit.values).map(([k, v]) => [k, String(v ?? "")])
+    );
+  });
+  const availableKits = kits.filter((k) => !k.is_deleted);
+
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors, isSubmitting },
-  } = useForm<OpForm>({ resolver: zodResolver(opSchema) });
+  } = useForm<OpForm>({
+    resolver: zodResolver(opSchema),
+    defaultValues: { kit: initialKitId ?? "" },
+  });
+
+  const watchedKitId = useWatch({ control, name: "kit" });
+
+  useEffect(() => {
+    const kit = availableKits.find((k) => k.kit_id === watchedKitId);
+    if (kit?.values && Object.keys(kit.values).length > 0) {
+      setKitValues(
+        Object.fromEntries(
+          Object.entries(kit.values).map(([k, v]) => [k, String(v ?? "")])
+        )
+      );
+    } else {
+      setKitValues({});
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchedKitId]);
 
   const onSubmit = async (data: OpForm) => {
     setError(null);
     try {
       const op = await createOperation({
         server_id: data.server_id,
-        kit: data.kit,
+        kit_id: data.kit,
         sudo: data.sudo,
+        debug_level: data.debug_level,
+        values: Object.keys(kitValues).length > 0 ? kitValues : undefined,
       });
       onCreated(op);
     } catch (err: unknown) {
@@ -263,7 +386,7 @@ function RunOperationModal({
             >
               <option value="">Select a server…</option>
               {servers.map((s) => (
-                <option key={s.id} value={s.id}>
+                <option key={s.server_id} value={s.server_id}>
                   {s.name} ({s.host})
                 </option>
               ))}
@@ -275,29 +398,77 @@ function RunOperationModal({
 
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-slate-700">Kit</label>
-            <Input
-              list="kit-suggestions"
-              placeholder="nginx"
-              error={errors.kit?.message}
-              {...register("kit")}
-            />
-            <datalist id="kit-suggestions">
-              {KNOWN_KITS.map((k) => (
-                <option key={k} value={k} />
-              ))}
-            </datalist>
+            {availableKits.length === 0 ? (
+              <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-400">
+                No synced kits available.{" "}
+                <Link href="/dashboard/kits" className="text-blue-600 underline">
+                  Sync a repository first.
+                </Link>
+              </p>
+            ) : (
+              <select
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                {...register("kit")}
+              >
+                <option value="">Select a kit…</option>
+                {availableKits.map((k) => (
+                  <option key={k.kit_id} value={k.kit_id}>
+                    {k.name}{k.version ? ` v${k.version}` : ""}
+                  </option>
+                ))}
+              </select>
+            )}
+            {errors.kit && (
+              <p className="text-xs text-red-500">{errors.kit.message}</p>
+            )}
           </div>
+
+          {/* Kit parameters — shown only when the selected kit has values */}
+          {Object.keys(kitValues).length > 0 && (
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-slate-700">Parameters</label>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2">
+                {Object.entries(kitValues).map(([key, val]) => (
+                  <div key={key} className="flex items-center gap-3">
+                    <span className="w-1/3 shrink-0 font-mono text-xs text-slate-500 truncate" title={key}>
+                      {key}
+                    </span>
+                    <input
+                      type="text"
+                      value={val}
+                      onChange={(e) =>
+                        setKitValues((prev) => ({ ...prev, [key]: e.target.value }))
+                      }
+                      className="flex-1 min-w-0 rounded border border-slate-300 bg-white px-2 py-1 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <label className="flex items-center gap-2 text-sm text-slate-700">
             <input type="checkbox" {...register("sudo")} className="rounded" />
             Run with sudo
           </label>
 
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-slate-700">Debug level</label>
+            <select
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+              {...register("debug_level")}
+            >
+              <option value="none">None</option>
+              <option value="errors">Errors only</option>
+              <option value="full">Full</option>
+            </select>
+          </div>
+
           <div className="flex justify-end gap-3 pt-2">
             <Button variant="secondary" type="button" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" loading={isSubmitting}>
+            <Button type="submit" loading={isSubmitting} disabled={availableKits.length === 0}>
               Run
             </Button>
           </div>
@@ -310,17 +481,69 @@ function RunOperationModal({
 function OperationDetailsModal({
   operation,
   onClose,
+  onUpdate,
+  onRetried,
 }: {
   operation: Operation;
   onClose: () => void;
+  onUpdate: (op: Operation) => void;
+  onRetried: (op: Operation) => void;
 }) {
+  const [actionLoading, setActionLoading] = useState<"cancel" | "retry" | "restore" | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [restoreFiles, setRestoreFiles] = useState<string[] | null>(null);
+
+  const canCancel = operation.status === "pending" || operation.status === "in_progress";
+  const canRetry = operation.status === "failed" || operation.status === "cancelled_unsafe";
+  const canRestore = canRetry && (operation.backup_files?.length ?? 0) > 0;
+
+  const handleCancel = async () => {
+    setActionLoading("cancel");
+    setActionError(null);
+    try {
+      const updated = await cancelOperation(operation.operation_id);
+      onUpdate(updated);
+    } catch {
+      setActionError("Failed to cancel operation.");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRetry = async () => {
+    setActionLoading("retry");
+    setActionError(null);
+    try {
+      const newOp = await retryOperation(operation.operation_id);
+      onRetried(newOp);
+    } catch {
+      setActionError("Failed to retry operation.");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRestore = async () => {
+    setActionLoading("restore");
+    setActionError(null);
+    setRestoreFiles(null);
+    try {
+      const result = await restoreOperation(operation.operation_id);
+      setRestoreFiles(result.restored_files);
+    } catch {
+      setActionError("Failed to start restore.");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="w-full max-w-2xl rounded-xl bg-white shadow-xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
           <div className="flex items-center gap-3">
             <h2 className="text-lg font-semibold text-slate-900">
-              Operation: {operation.kit}
+              Operation: {operation.kit_id}
             </h2>
             {statusBadge(operation.status)}
           </div>
@@ -344,11 +567,11 @@ function OperationDetailsModal({
                 {new Date(operation.created_at).toLocaleString()}
               </p>
             </div>
-            {operation.completed_at && (
+            {operation.finished_at && (
               <div>
                 <p className="text-slate-400">Completed</p>
                 <p className="font-medium text-slate-800">
-                  {new Date(operation.completed_at).toLocaleString()}
+                  {new Date(operation.finished_at).toLocaleString()}
                 </p>
               </div>
             )}
@@ -361,6 +584,21 @@ function OperationDetailsModal({
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
               Operation is running… Auto-refreshing every 3 seconds.
+            </div>
+          )}
+
+          {actionError && (
+            <Alert variant="error" message={actionError} />
+          )}
+
+          {restoreFiles !== null && (
+            <div className="rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">
+              Restore queued for {restoreFiles.length} file{restoreFiles.length !== 1 ? "s" : ""}
+              {restoreFiles.length > 0 && (
+                <ul className="mt-1 list-inside list-disc font-mono text-xs">
+                  {restoreFiles.map((f) => <li key={f}>{f}</li>)}
+                </ul>
+              )}
             </div>
           )}
 
@@ -386,12 +624,55 @@ function OperationDetailsModal({
             </div>
           )}
         </div>
-        <div className="flex justify-end border-t border-slate-200 px-6 py-4">
+        <div className="flex items-center justify-between border-t border-slate-200 px-6 py-4">
+          <div className="flex gap-2">
+            {canCancel && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleCancel}
+                loading={actionLoading === "cancel"}
+                disabled={!!actionLoading}
+              >
+                Cancel operation
+              </Button>
+            )}
+            {canRetry && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleRetry}
+                loading={actionLoading === "retry"}
+                disabled={!!actionLoading}
+              >
+                Retry
+              </Button>
+            )}
+            {canRestore && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleRestore}
+                loading={actionLoading === "restore"}
+                disabled={!!actionLoading || restoreFiles !== null}
+              >
+                Restore backup
+              </Button>
+            )}
+          </div>
           <Button variant="secondary" onClick={onClose}>
             Close
           </Button>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function OperationsPage() {
+  return (
+    <Suspense>
+      <OperationsPageInner />
+    </Suspense>
   );
 }

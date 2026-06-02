@@ -37,6 +37,24 @@ const navItems = [
     ),
   },
   {
+    href: "/dashboard/credentials",
+    label: "Credentials",
+    icon: (
+      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+      </svg>
+    ),
+  },
+  {
+    href: "/dashboard/kits",
+    label: "Kits",
+    icon: (
+      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+      </svg>
+    ),
+  },
+  {
     href: "/dashboard/profile",
     label: "Profile",
     icon: (
@@ -56,6 +74,7 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [backendDown, setBackendDown] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated()) {
@@ -63,12 +82,40 @@ export default function DashboardLayout({
       return;
     }
     getMe()
-      .then(setUser)
-      .catch(() => {
-        clearTokens();
-        router.replace("/login");
+      .then((u) => {
+        setUser(u);
+        setBackendDown(false);
+      })
+      .catch((err: unknown) => {
+        const e = err as { response?: { status?: number } };
+        if (!e?.response) {
+          // Network error — backend unreachable
+          setBackendDown(true);
+        } else {
+          // Auth error (401/403) — clear session and redirect
+          clearTokens();
+          router.replace("/login");
+        }
       });
   }, [router]);
+
+  const handleRetry = () => {
+    setBackendDown(false);
+    getMe()
+      .then((u) => {
+        setUser(u);
+        setBackendDown(false);
+      })
+      .catch((err: unknown) => {
+        const e = err as { response?: { status?: number } };
+        if (!e?.response) {
+          setBackendDown(true);
+        } else {
+          clearTokens();
+          router.replace("/login");
+        }
+      });
+  };
 
   const handleLogout = async () => {
     const refreshToken = localStorage.getItem("refresh_token") ?? "";
@@ -171,7 +218,41 @@ export default function DashboardLayout({
           <span className="text-lg font-bold text-slate-900">ikctl</span>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+        <main className="flex-1 overflow-y-auto p-6">
+          {backendDown && (
+            <div className="mb-6 flex items-center justify-between rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-800">
+              <div className="flex items-center gap-2">
+                <svg
+                  className="h-4 w-4 shrink-0"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+                  />
+                </svg>
+                <span>
+                  Cannot connect to the backend. Check that the server is running at{" "}
+                  <code className="font-mono text-xs">
+                    {process.env.NEXT_PUBLIC_API_URL ?? "API_URL"}
+                  </code>
+                  .
+                </span>
+              </div>
+              <button
+                onClick={handleRetry}
+                className="ml-4 shrink-0 rounded-md border border-orange-300 bg-white px-3 py-1 text-xs font-medium text-orange-700 hover:bg-orange-50 transition"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+          {children}
+        </main>
       </div>
     </div>
   );
