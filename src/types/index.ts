@@ -78,12 +78,17 @@ export interface CreateServerPayload {
 }
 
 export interface CreateOperationPayload {
-  server_id: string;
+  server_id?: string;
+  group_id?: string;
   kit_id: string;
   sudo?: boolean;
   debug_level?: "none" | "errors" | "full";
   values?: Record<string, unknown>;
   timeout_seconds?: number;
+}
+
+export interface BatchOperationResponse {
+  operations: Operation[];
 }
 
 export interface PaginatedResponse<T> {
@@ -177,4 +182,105 @@ export interface Kit {
   sync_error_message: string | null;
   created_at: string;
   updated_at: string;
+}
+
+// ── Groups ────────────────────────────────────────────────────────────────────
+
+export interface Group {
+  group_id: string;
+  user_id: string;
+  name: string;
+  description: string | null;
+  server_ids: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateGroupPayload {
+  name: string;
+  description?: string;
+  server_ids?: string[];
+}
+
+export interface UpdateGroupPayload {
+  name?: string;
+  description?: string | null;
+  server_ids?: string[];
+}
+
+// ── Pipelines ─────────────────────────────────────────────────────────────────
+
+export interface PipelineTarget {
+  server_id: string;
+}
+
+export interface PipelineKitConfig {
+  kit_id: string;
+  sudo?: boolean | null;
+  debug_level?: "none" | "errors" | "full" | null;
+  values?: Record<string, unknown>;
+}
+
+export interface Pipeline {
+  pipeline_id: string;
+  user_id: string;
+  name: string;
+  description: string | null;
+  targets: PipelineTarget[];
+  kits: PipelineKitConfig[];
+  sudo: boolean;
+  debug_level: "none" | "errors" | "full";
+  values: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreatePipelinePayload {
+  name: string;
+  description?: string;
+  targets: PipelineTarget[];
+  kits: PipelineKitConfig[];
+  sudo?: boolean;
+  debug_level?: "none" | "errors" | "full";
+}
+
+export interface UpdatePipelinePayload {
+  name?: string;
+  description?: string;
+  targets?: PipelineTarget[];
+  kits?: PipelineKitConfig[];
+  sudo?: boolean;
+  debug_level?: "none" | "errors" | "full";
+}
+
+export interface PipelineOperationRef {
+  operation_id: string;
+  server_id: string;
+  kit_id: string;
+  status: "pending" | "in_progress" | "completed" | "failed" | "cancelled" | "cancelled_unsafe";
+  output?: string;
+  error?: string;
+}
+
+export interface PipelineExecution {
+  execution_id: string;
+  pipeline_id: string;
+  status: "pending" | "in_progress" | "completed" | "failed" | "partial";
+  operations: PipelineOperationRef[];
+  created_at: string;
+  started_at?: string;
+  finished_at: string | null;
+  snapshot?: Record<string, unknown>;
+}
+
+export interface PipelineExecutionSummary {
+  execution_id: string;
+  pipeline_id: string;
+  status: "pending" | "in_progress" | "completed" | "failed" | "partial";
+  total_operations: number;
+  completed_operations: number;
+  failed_operations: number;
+  created_at: string;
+  started_at?: string;
+  finished_at: string;
 }

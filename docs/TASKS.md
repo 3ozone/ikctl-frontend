@@ -130,6 +130,72 @@
 
 ---
 
+---
+
+## Fase 9: Grupos de servidores — módulo completo
+
+Implementadas en sesión anterior (no estaban en TASKS.md originales):
+
+- [x] **T-09.1**: Tipo `Group`, `CreateGroupPayload`, `UpdateGroupPayload` en `src/types/index.ts`
+- [x] **T-09.2**: Endpoints `getGroups`, `getGroup`, `createGroup`, `updateGroup`, `deleteGroup` en `src/lib/services.ts`
+- [x] **T-09.3**: Página `/dashboard/groups` — listado paginado, modal crear/editar con selector de servidores por checkbox, `ConfirmDialog` para borrar
+- [x] **T-09.4**: Entrada "Groups" en el sidebar (`dashboard/layout.tsx`) entre Servers y Operations
+
+---
+
+## Fase 10: Soporte de grupos en operaciones (batch)
+
+> Requiere cambios en **backend** (ikctl) y después en **frontend** (ikctl-frontend).
+> El backend no tiene ningún soporte de grupos en el módulo de operaciones todavía.
+
+### 10-A: Backend — Capa de dominio y aplicación
+
+- [x] **T-10.1**: Añadir `find_group_by_id_internal(group_id: str) -> Optional[Group]` y `find_servers_by_ids(server_ids: list[str]) -> list[Server]` al port `operations/application/interfaces/server_repository.py`
+- [x] **T-10.2**: Crear DTO `BatchOperationResult(operations: list[OperationResult])` en `operations/application/dtos/operation_dtos.py`
+- [x] **T-10.3**: Crear caso de uso `LaunchBatchOperation` en `operations/application/commands/launch_batch_operation.py` — recibe `group_id`, resuelve el grupo, itera sobre `server_ids` llamando a la lógica de `LaunchOperation` por cada servidor, devuelve `BatchOperationResult`
+- [x] **T-10.4**: Añadir excepción de aplicación `GroupNotFoundError` a `operations/application/exceptions.py`
+
+### 10-B: Backend — Capa de infraestructura
+
+- [x] **T-10.5**: Implementar `find_group_by_id_internal` y `find_servers_by_ids` en `operations/infrastructure/adapters/server_read_adapter.py` (siguiendo el patrón del adapter de pipelines)
+- [x] **T-10.6**: Registrar `LaunchBatchOperation` en `operations/infrastructure/presentation/deps.py` — inyectar el mismo `ServerReadAdapter` extendido
+- [x] **T-10.7**: Añadir handler `GroupNotFoundError → 404` en `operations/infrastructure/presentation/exception_handlers.py`
+
+### 10-C: Backend — Capa de presentación
+
+- [x] **T-10.8**: Actualizar `LaunchOperationRequest` en `operations/infrastructure/presentation/schemas.py`:
+  - `server_id` pasa a ser opcional (`str | None = None`)
+  - Añadir `group_id: str | None = None`
+  - Añadir validador `@model_validator`: exactamente uno de `server_id` / `group_id` debe estar presente
+- [x] **T-10.9**: Añadir schema `BatchOperationResponse(operations: list[OperationResponse])` en `schemas.py`
+- [x] **T-10.10**: Actualizar ruta `POST /api/v1/operations` en `routes.py`:
+  - Si `server_id` → comportamiento actual, devuelve `OperationResponse` (201)
+  - Si `group_id` → usa `LaunchBatchOperation`, devuelve `BatchOperationResponse` (201)
+
+### 10-D: Backend — Documentación
+
+- [x] **T-10.11**: Actualizar `openapi.yaml` — schema `OperationLaunch`:
+  - `server_id` pasa a opcional
+  - Añadir `group_id: string` opcional
+  - Añadir nota: exactamente uno de los dos es obligatorio
+- [x] **T-10.12**: Añadir schema `BatchOperationResponse` en `openapi.yaml` con `operations: array<Operation>`
+- [x] **T-10.13**: Actualizar respuesta `POST /api/v1/operations` en `openapi.yaml`:
+  - `201` con `oneOf: [OperationResponse, BatchOperationResponse]` (discriminado por presencia de `group_id` en request)
+- [x] **T-10.14**: Corregir discrepancias existentes en `openapi.yaml` detectadas en el audit:
+  - `Operation.id` → `operation_id`
+  - Añadir `backup_files` y `updated_at` al schema `Operation`
+  - Eliminar `error` del schema `Operation` (no existe en `OperationResponse` Pydantic)
+  - Corregir código de respuesta `POST /api/v1/operations`: `202` → `201`
+
+### 10-E: Frontend
+
+- [x] **T-10.15**: Actualizar `CreateOperationPayload` en `src/types/index.ts`: `server_id` opcional, añadir `group_id?: string`; añadir tipo `BatchOperationResponse`
+- [x] **T-10.16**: Actualizar `createOperation` en `src/lib/services.ts` para devolver `Operation | BatchOperationResponse`
+- [x] **T-10.17**: Añadir selector de target en `RunOperationModal`: radio `Single server` / `Group`; mostrar select de servidores o select de grupos según selección
+- [x] **T-10.18**: Manejar respuesta batch en `OperationsPageInner`: si es `BatchOperationResponse`, prepend de todas las operaciones a la lista, iniciar polling de la primera operación activa
+
+---
+
 ## Convenciones de este fichero
 
 - `[x]` tarea completada

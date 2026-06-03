@@ -7,6 +7,7 @@ import type {
   Server,
   ServerHealth,
   Operation,
+  BatchOperationResponse,
   RestoreResponse,
   PaginatedResponse,
   Credential,
@@ -17,6 +18,14 @@ import type {
   UpdateRepositoryPayload,
   RepositorySyncResponse,
   Kit,
+  Group,
+  CreateGroupPayload,
+  UpdateGroupPayload,
+  Pipeline,
+  CreatePipelinePayload,
+  UpdatePipelinePayload,
+  PipelineExecution,
+  PipelineExecutionSummary,
 } from "@/types";
 
 // ── Auth ────────────────────────────────────────────────────────────────────
@@ -177,7 +186,7 @@ export async function getOperation(id: string) {
 }
 
 export async function createOperation(payload: CreateOperationPayload) {
-  const { data } = await api.post<Operation>("/api/v1/operations", payload);
+  const { data } = await api.post<Operation | BatchOperationResponse>("/api/v1/operations", payload);
   return data;
 }
 
@@ -278,5 +287,89 @@ export async function getKits(
 
 export async function getKit(id: string) {
   const { data } = await api.get<Kit>(`/api/v1/kits/${id}`);
+  return data;
+}
+
+// ── Groups ────────────────────────────────────────────────────────────────────
+
+export async function getGroups(page = 1, limit = 20) {
+  const { data } = await api.get<PaginatedResponse<Group>>(
+    `/api/v1/groups?page=${page}&limit=${limit}`
+  );
+  return data;
+}
+
+export async function getGroup(id: string) {
+  const { data } = await api.get<Group>(`/api/v1/groups/${id}`);
+  return data;
+}
+
+export async function createGroup(payload: CreateGroupPayload) {
+  const { data } = await api.post<Group>("/api/v1/groups", payload);
+  return data;
+}
+
+export async function updateGroup(id: string, payload: UpdateGroupPayload) {
+  const { data } = await api.put<Group>(`/api/v1/groups/${id}`, payload);
+  return data;
+}
+
+export async function deleteGroup(id: string) {
+  await api.delete(`/api/v1/groups/${id}`);
+}
+
+// ── Pipelines ─────────────────────────────────────────────────────────────────
+
+export async function getPipelines(page = 1, limit = 20) {
+  const { data } = await api.get<PaginatedResponse<Pipeline>>(
+    `/api/v1/pipelines?page=${page}&per_page=${limit}`
+  );
+  return data;
+}
+
+export async function getPipeline(id: string) {
+  const { data } = await api.get<Pipeline>(`/api/v1/pipelines/${id}`);
+  return data;
+}
+
+export async function createPipeline(payload: CreatePipelinePayload) {
+  const { data } = await api.post<Pipeline>("/api/v1/pipelines", payload);
+  return data;
+}
+
+export async function updatePipeline(id: string, payload: UpdatePipelinePayload) {
+  const { data } = await api.put<Pipeline>(`/api/v1/pipelines/${id}`, payload);
+  return data;
+}
+
+export async function deletePipeline(id: string) {
+  await api.delete(`/api/v1/pipelines/${id}`);
+}
+
+export async function launchPipeline(id: string) {
+  const { data } = await api.post<PipelineExecution>(
+    `/api/v1/pipelines/${id}/executions`
+  );
+  return data;
+}
+
+export async function getPipelineStatus(id: string): Promise<PipelineExecution | null> {
+  const { data } = await api.get<PaginatedResponse<PipelineExecution>>(
+    `/api/v1/pipelines/${id}/executions?page=1&per_page=1`
+  );
+  return data.items?.[0] ?? null;
+}
+
+export async function getPipelineHistory(id: string, page = 1, limit = 20) {
+  const { data } = await api.get<PaginatedResponse<PipelineExecutionSummary>>(
+    `/api/v1/pipelines/${id}/executions?page=${page}&per_page=${limit}`
+  );
+  return data;
+}
+
+export async function getPipelineExecution(pipelineId: string, execId: string) {
+  const { data } = await api.get<PipelineExecution>(
+    `/api/v1/pipelines/${pipelineId}/executions/${execId}`
+  );
   return data;
 }

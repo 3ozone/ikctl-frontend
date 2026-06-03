@@ -3,8 +3,8 @@
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { getOperations, getServers, createOperation, getOperation, cancelOperation, retryOperation, restoreOperation, getKits } from "@/lib/services";
-import type { Operation, Server, Kit } from "@/types";
+import { getOperations, getServers, createOperation, getOperation, cancelOperation, retryOperation, restoreOperation, getKits, getGroups } from "@/lib/services";
+import type { Operation, Server, Kit, Group, BatchOperationResponse } from "@/types";
 import { Card, CardHeader, CardBody } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -27,7 +27,8 @@ const STATUS_OPTIONS: { value: string; label: string }[] = [
 ];
 
 const opSchema = z.object({
-  server_id: z.string().min(1, "Select a server"),
+  server_id: z.string().optional(),
+  group_id: z.string().optional(),
   kit: z.string().min(1, "Select a kit"),
   sudo: z.boolean().optional(),
   debug_level: z.enum(["none", "errors", "full"]).optional(),
@@ -51,6 +52,7 @@ function OperationsPageInner() {
   const preselectedKitId = searchParams.get("kit_id");
   const [operations, setOperations] = useState<Operation[]>([]);
   const [servers, setServers] = useState<Server[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [kits, setKits] = useState<Kit[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -93,6 +95,7 @@ function OperationsPageInner() {
   useEffect(() => {
     fetchOperations(1, "", "");
     getServers().then((res) => setServers(res.items ?? [])).catch(() => {});
+    getGroups().then((res) => setGroups(res.items ?? [])).catch(() => {});
     getKits(1, 50).then((res) => setKits(res.items ?? [])).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -259,6 +262,8 @@ function OperationsPageInner() {
       {selected && (
         <OperationDetailsModal
           operation={selected}
+          resolvedServerName={serverName(selected.server_id)}
+          resolvedKitName={kitName(selected.kit_id)}
           onClose={() => {
             setSelected(null);
             setPollingId(null);
@@ -282,14 +287,25 @@ function OperationsPageInner() {
       {showForm && (
         <RunOperationModal
           servers={servers}
+          groups={groups}
           kits={kits}
           initialKitId={preselectedKitId ?? undefined}
           onClose={() => setShowForm(false)}
-          onCreated={(op) => {
-            setOperations((prev) => [op, ...prev]);
+          onCreated={(result) => {
             setShowForm(false);
-            setSelected(op);
-            setPollingId(op.operation_id);
+            if ("operations" in result) {
+              // Batch: prepend all, poll first active
+              setOperations((prev) => [...result.operations, ...prev]);
+              const firstActive = result.operations.find(
+                (op) => op.status === "pending" || op.status === "in_progress"
+              );
+              if (firstActive) setPollingId(firstActive.operation_id);
+            } else {
+              // Single: existing behaviour
+              setOperations((prev) => [result, ...prev]);
+              setSelected(result);
+              setPollingId(result.operation_id);
+            }
           }}
         />
       )}
@@ -299,26 +315,31 @@ function OperationsPageInner() {
 
 function RunOperationModal({
   servers,
+  groups,
   kits,
   initialKitId,
   onClose,
   onCreated,
 }: {
   servers: Server[];
+  groups: Group[];
   kits: Kit[];
   initialKitId?: string;
   onClose: () => void;
-  onCreated: (op: Operation) => void;
+  onCreated: (result: Operation | BatchOperationResponse) => void;
 }) {
+  type ParamRow = { id: number; key: string; value: string };
+
+  const kitToRows = (kit: Kit | undefined): ParamRow[] =>
+    kit?.values
+      ? Object.entries(kit.values).map(([k, v], i) => ({ id: i, key: k, value: String(v ?? "") }))
+      : [];
+
   const [error, setError] = useState<string | null>(null);
-  const [kitValues, setKitValues] = useState<Record<string, string>>(() => {
-    if (!initialKitId) return {};
-    const kit = kits.find((k) => k.kit_id === initialKitId && !k.is_deleted);
-    if (!kit?.values) return {};
-    return Object.fromEntries(
-      Object.entries(kit.values).map(([k, v]) => [k, String(v ?? "")])
-    );
-  });
+  const [targetMode, setTargetMode] = useState<"server" | "group">("server");
+  const [params, setParams] = useState<ParamRow[]>(() =>
+    kitToRows(kits.find((k) => k.kit_id === initialKitId && !k.is_deleted))
+  );
   const availableKits = kits.filter((k) => !k.is_deleted);
 
   const {
@@ -335,29 +356,33 @@ function RunOperationModal({
 
   useEffect(() => {
     const kit = availableKits.find((k) => k.kit_id === watchedKitId);
-    if (kit?.values && Object.keys(kit.values).length > 0) {
-      setKitValues(
-        Object.fromEntries(
-          Object.entries(kit.values).map(([k, v]) => [k, String(v ?? "")])
-        )
-      );
-    } else {
-      setKitValues({});
-    }
+    setParams(kitToRows(kit));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchedKitId]);
 
   const onSubmit = async (data: OpForm) => {
     setError(null);
+    if (targetMode === "server" && !data.server_id) {
+      setError("Please select a server.");
+      return;
+    }
+    if (targetMode === "group" && !data.group_id) {
+      setError("Please select a group.");
+      return;
+    }
     try {
-      const op = await createOperation({
-        server_id: data.server_id,
+      const filledParams = params.filter((p) => p.key.trim());
+      const result = await createOperation({
+        server_id: targetMode === "server" ? data.server_id : undefined,
+        group_id: targetMode === "group" ? data.group_id : undefined,
         kit_id: data.kit,
         sudo: data.sudo,
         debug_level: data.debug_level,
-        values: Object.keys(kitValues).length > 0 ? kitValues : undefined,
+        values: filledParams.length > 0
+          ? Object.fromEntries(filledParams.map((p) => [p.key.trim(), p.value]))
+          : undefined,
       });
-      onCreated(op);
+      onCreated(result);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } } };
       setError(e?.response?.data?.message ?? "Failed to start operation.");
@@ -378,23 +403,61 @@ function RunOperationModal({
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 px-6 py-4">
           {error && <Alert variant="error" message={error} />}
 
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-slate-700">Server</label>
-            <select
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-              {...register("server_id")}
-            >
-              <option value="">Select a server…</option>
-              {servers.map((s) => (
-                <option key={s.server_id} value={s.server_id}>
-                  {s.name} ({s.host})
-                </option>
-              ))}
-            </select>
-            {errors.server_id && (
-              <p className="text-xs text-red-500">{errors.server_id.message}</p>
-            )}
+          {/* Target mode selector */}
+          <div className="flex gap-4">
+            <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+              <input
+                type="radio"
+                name="targetMode"
+                value="server"
+                checked={targetMode === "server"}
+                onChange={() => setTargetMode("server")}
+              />
+              Single server
+            </label>
+            <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+              <input
+                type="radio"
+                name="targetMode"
+                value="group"
+                checked={targetMode === "group"}
+                onChange={() => setTargetMode("group")}
+              />
+              Group
+            </label>
           </div>
+
+          {targetMode === "server" ? (
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-slate-700">Server</label>
+              <select
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                {...register("server_id")}
+              >
+                <option value="">Select a server…</option>
+                {servers.map((s) => (
+                  <option key={s.server_id} value={s.server_id}>
+                    {s.name} ({s.host})
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-slate-700">Group</label>
+              <select
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                {...register("group_id")}
+              >
+                <option value="">Select a group…</option>
+                {groups.map((g) => (
+                  <option key={g.group_id} value={g.group_id}>
+                    {g.name}{g.server_ids.length > 0 ? ` (${g.server_ids.length} servers)` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-slate-700">Kit</label>
@@ -423,23 +486,26 @@ function RunOperationModal({
             )}
           </div>
 
-          {/* Kit parameters — shown only when the selected kit has values */}
-          {Object.keys(kitValues).length > 0 && (
+          {/* Kit parameters */}
+          {params.length > 0 && (
             <div className="flex flex-col gap-2">
               <label className="text-sm font-medium text-slate-700">Parameters</label>
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2">
-                {Object.entries(kitValues).map(([key, val]) => (
-                  <div key={key} className="flex items-center gap-3">
-                    <span className="w-1/3 shrink-0 font-mono text-xs text-slate-500 truncate" title={key}>
-                      {key}
+                {params.map((row) => (
+                  <div key={row.id} className="flex items-center gap-2">
+                    <span className="w-1/3 shrink-0 font-mono text-xs text-slate-500 truncate" title={row.key}>
+                      {row.key}
                     </span>
                     <input
                       type="text"
-                      value={val}
+                      value={row.value}
                       onChange={(e) =>
-                        setKitValues((prev) => ({ ...prev, [key]: e.target.value }))
+                        setParams((prev) =>
+                          prev.map((p) => p.id === row.id ? { ...p, value: e.target.value } : p)
+                        )
                       }
                       className="flex-1 min-w-0 rounded border border-slate-300 bg-white px-2 py-1 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      placeholder="value"
                     />
                   </div>
                 ))}
@@ -483,11 +549,15 @@ function OperationDetailsModal({
   onClose,
   onUpdate,
   onRetried,
+  resolvedServerName,
+  resolvedKitName,
 }: {
   operation: Operation;
   onClose: () => void;
   onUpdate: (op: Operation) => void;
   onRetried: (op: Operation) => void;
+  resolvedServerName?: string;
+  resolvedKitName?: string;
 }) {
   const [actionLoading, setActionLoading] = useState<"cancel" | "retry" | "restore" | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -543,7 +613,7 @@ function OperationDetailsModal({
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
           <div className="flex items-center gap-3">
             <h2 className="text-lg font-semibold text-slate-900">
-              Operation: {operation.kit_id}
+              Operation: {resolvedKitName ?? operation.kit_id}
             </h2>
             {statusBadge(operation.status)}
           </div>
@@ -558,7 +628,7 @@ function OperationDetailsModal({
             <div>
               <p className="text-slate-400">Server</p>
               <p className="font-medium text-slate-800">
-                {operation.server_name ?? operation.server_id}
+                {resolvedServerName ?? operation.server_name ?? operation.server_id}
               </p>
             </div>
             <div>
