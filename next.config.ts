@@ -1,9 +1,5 @@
 import type { NextConfig } from "next";
 
-<<<<<<< HEAD
-const nextConfig: NextConfig = {
-  /* config options here */
-=======
 const securityHeaders = [
   { key: "X-Frame-Options", value: "DENY" },
   { key: "X-Content-Type-Options", value: "nosniff" },
@@ -33,7 +29,6 @@ const nextConfig: NextConfig = {
       },
     ];
   },
->>>>>>> origin/main
 };
 
 export default nextConfig;
